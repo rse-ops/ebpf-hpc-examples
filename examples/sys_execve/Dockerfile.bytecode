@@ -1,0 +1,7 @@
+FROM rse-ops/ebpf-hpc-examples:sys_execv as base
+FROM scratch
+COPY --from=base /code/bpf_bpfel.o bpf_bpfel.o
+LABEL io.ebpf.program_type kprobe
+LABEL io.ebpf.filename bpf_bpfel.o
+LABEL io.ebpf.program_name kprobe_counter
+LABEL io.ebpf.bpf_function_name kprobe_counter

@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: go-kprobe-counter
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bpfman-app-go-kprobe-counter
+  namespace: go-kprobe-counter
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    k8s-app: go-kprobe-counter
+  name: go-kprobe-counter-ds
+  namespace: go-kprobe-counter
+spec:
+  selector:
+    matchLabels:
+      name: go-kprobe-counter
+  template:
+    metadata:
+      labels:
+        name: go-kprobe-counter
+    spec:
+      containers:
+      - env:
+        - name: NODENAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        image: rse-ops/ebpf-hpc-examples:sys_execv
+        imagePullPolicy: IfNotPresent
+        name: go-kprobe-counter
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsGroup: 65534
+          runAsUser: 65534
+        volumeMounts:
+        - mountPath: /run/kprobe/maps
+          name: go-kprobe-counter-maps
+          readOnly: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector: {}
+      securityContext:
+        fsGroup: 65534
+        runAsNonRoot: true
+      serviceAccountName: bpfman-app-go-kprobe-counter
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - csi:
+          driver: csi.bpfman.io
+          volumeAttributes:
+            csi.bpfman.io/maps: kprobe_stats_map
+            csi.bpfman.io/program: go-kprobe-counter-example
+        name: go-kprobe-counter-maps
+---
+apiVersion: bpfman.io/v1alpha1
+kind: KprobeProgram
+metadata:
+  labels:
+    app.kubernetes.io/name: kprobeprogram
+  name: go-kprobe-counter-example
+spec:
+  bpffunctionname: kprobe_counter
+  bytecode:
+    image:
+      imagepullpolicy: IfNotPresent
+      url: rse-ops/ebpf-hpc-examples:sys_execv-bytecode
+  func_name: try_to_wake_up
+  nodeselector: {}
+  offset: 0
+  retprobe: false
